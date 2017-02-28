@@ -1,0 +1,105 @@
+---
+#autor: Radchenko Vitalii (vitaliy.michailovich@gmail.com)
+- hosts: SonarQube
+
+  vars:
+    sq_mysql_host: 10.33.41.158:3306
+    sq_mysql_login: sonarqube
+    sq_mysql_password: sonarqube_password
+
+  tasks:
+    - name: Unzip | Install
+      yum:
+        name: unzip
+        state: latest
+
+    - name: SonarQube | Unpuck
+      unarchive:
+        src: https://sonarsource.bintray.com/Distribution/sonarqube/sonarqube-6.2.zip
+        dest: /etc/
+        remote_src: True
+
+    - name: SonarQube | Rename directory
+      command: mv /etc/sonarqube-6.2/ /etc/sonarqube/
+
+    - name: SonarQube | Copy template of property file
+      template:
+        src: templates/sonar.properties.j2
+        dest: /etc/sonarqube/conf/sonar.properties
+
+    - name: ENV | Add variables
+      lineinfile:
+        destfile: '/root/.bash_profile'
+        state: present
+        regexp: 'export PATH'
+        line: 'SONAR_HOME=/etc/sonarqube/
+        
+        JAVA_HOME=/opt/jdk1.8.0_121
+        
+        JRE_HOME=/opt/jdk1.8.0_121/jre
+        
+        PATH=$PATH:$SONAR_HOME/bin:$JAVA_HOME/bin:$JRE_HOME/bin
+        
+        
+        export PATH'
+
+    - name: Init.d | Copy template
+      template:
+        src: templates/sonar.j2
+        dest: /etc/init.d/sonar
+
+    - name: Group | Create
+      group:
+        name: sonar
+        state: present
+
+    - name: User | Create
+      user: 
+        name: sonar
+        group: sonar
+        state: present
+
+    - name: SonarQube | Link
+      file:
+        src: /etc/sonarqube/bin/linux-x86-64/sonar.sh
+        state: link
+        force: yes
+        dest: /usr/bin/sonar
+        owner: sonar
+        group: sonar
+        mode: 0755
+
+    - name: Java8 | Download
+      get_url:
+        url: http://download.oracle.com/otn-pub/java/jdk/8u121-b13/e9e7ea248e2c4826b92b3f075a80e441/jdk-8u121-linux-x64.tar.gz
+        dest: /opt/
+        headers: "Cookie: gpw_e24=http%3A%2F%2Fwww.oracle.com%2F; oraclelicense=accept-securebackup-cookie"
+
+    - name: Java8 | Unpuck
+      unarchive:
+        src: /opt/jdk-8u121-linux-x64.tar.gz
+        dest: /opt
+        remote_src: True
+
+    - name: Java 8 | Install
+      command: "alternatives --install /usr/bin/java java /opt/jdk1.8.0_121/bin/java 1"
+
+    - command: "alternatives --install /usr/bin/jar jar /opt/jdk1.8.0_121/bin/jar 1"
+
+    - command: "alternatives --install /usr/bin/javac javac /opt/jdk1.8.0_121/bin/javac 1"
+
+    - command: "alternatives --set jar /opt/jdk1.8.0_121/bin/jar"
+
+    - command: "alternatives --set javac /opt/jdk1.8.0_121/bin/javac"
+
+    - name: Firewall | Open 80 port
+      firewalld:
+        port: 80/tcp
+        permanent: true
+        state: enabled
+
+    - name: Firewall | Reload
+      command: "firewall-cmd --reload"
+
+    - name: SonarQube | Start
+      command: "sonar start"
