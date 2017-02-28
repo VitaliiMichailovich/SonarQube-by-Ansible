@@ -8,3 +8,5 @@ In SonarQube.yml you should change ip address, port, username and password to yo
 And you need to create database "sonar".
 
 To use playbook do next command "ansible-playbook SonarQube.yml -i inventory -vv".
+
+Port is 80.
